@@ -4,12 +4,17 @@ from scipy import optimize
 TIME_AVG = True
 FRAC_TO_END = 0.5
 TAG = 'RussiaUkraine'
+SCORE_FUNC = 'brier'
+
+assert SCORE_FUNC in ['log', 'brier']
 
 if TIME_AVG:
-    print("Analyzing time-averaged probability of each market")
+    print("Analyzing time-averaged probability of each market.")
 else:
     print(f"Analyzing probability of each market {FRAC_TO_END * 100}% of the"
           + " way thru its life.")
+
+print("Analysis will use the " + SCORE_FUNC + " score.")
 
 url = requests.get("https://manifold.markets/api/v0/markets")
 text = url.text
@@ -19,10 +24,22 @@ for market in data:
     if TAG in market['tags'] and market['isResolved']:
         resolved_markets.append(market)
 
+
 def and_func(x, y):
     return x and y
 
-log_scores = []
+
+def log_score(prob, outcome):
+    prob_outcome = market_prob if outcome == 'YES' else 1 - market_prob
+    return math.log2(prob_outcome)
+
+
+def brier_score(prob, outcome):
+    prob_outcome = market_prob if outcome == 'YES' else 1 - market_prob
+    return (1 - prob_outcome)**2
+
+    
+scores = []
 for market in resolved_markets:
     market_id = market['id']
     market_url = "https://manifold.markets/api/v0/market/" + market_id
@@ -69,30 +86,39 @@ for market in resolved_markets:
     is_binary = functools.reduce(and_func, are_bets_binary, True)
     defined_outcome = outcome in ['YES', 'NO']
     if is_binary and defined_outcome:
-        log_score_if_yes = math.log2(market_prob)
-        log_score_if_no = math.log2(1 - market_prob)
-        log_score = log_score_if_yes if outcome == 'YES' else log_score_if_no
-        log_scores.append(log_score)
+        if SCORE_FUNC == 'log':
+            scores.append(log_score(market_prob, outcome))
+        elif SCORE_FUNC == 'brier':
+            scores.append(brier_score(market_prob, outcome))
 
-average_score = sum(log_scores) / len(log_scores)
-print("Number of markets analyzed:", len(log_scores))
-print("Average log score:", average_score)
+average_score = sum(scores) / len(scores)
+print("Number of markets analyzed:", len(scores))
+print("Average score:", average_score)
 
 def oracle_log_score(p):
     return p * math.log2(p) + (1-p) * math.log2(1-p)
 
-def oracle_score_minus_manifold_score(p):
-    return oracle_log_score(p) - average_score
+def oracle_brier_score(p):
+    return p * (1 - p)**2 + (1-p) * p**2
 
 def oracle_log_score_deriv(p):
     return math.log2(p) - math.log2(1-p)
 
-oracle_prob_sol = optimize.root_scalar(oracle_score_minus_manifold_score,
-                                       x0=0.6, fprime=oracle_log_score_deriv,
-                                       method='newton')
+def oracle_brier_score_deriv(p):
+    return 1 - 2*p
+
+f = oracle_log_score if SCORE_FUNC == 'log' else oracle_brier_score
+fprime = (oracle_log_score_deriv
+          if SCORE_FUNC == 'log'
+          else oracle_brier_score_deriv)
+
+oracle_prob_sol = optimize.root_scalar(lambda p: f(p) - average_score, x0=0.6,
+                                       fprime=fprime, method='newton')
 oracle_prob = oracle_prob_sol.root
-oracle_score = oracle_log_score(oracle_prob)
+oracle_score = (oracle_log_score(oracle_prob)
+                if SCORE_FUNC == 'log'
+                else oracle_brier_score(oracle_prob))
 print("This is as good as an oracle that knows the answer with probability",
       oracle_prob)
-print("Just checking: that oracle would get an average log score of",
+print("Just checking: that oracle would get an average score of",
       oracle_score)
