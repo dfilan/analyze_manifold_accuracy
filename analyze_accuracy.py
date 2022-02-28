@@ -88,7 +88,7 @@ def oracle_log_score_deriv(p):
     return math.log2(p) - math.log2(1-p)
 
 oracle_prob_sol = optimize.root_scalar(oracle_score_minus_manifold_score,
-                                       x0=0.5, fprime=oracle_log_score_deriv,
+                                       x0=0.6, fprime=oracle_log_score_deriv,
                                        method='newton')
 oracle_prob = oracle_prob_sol.root
 oracle_score = oracle_log_score(oracle_prob)
