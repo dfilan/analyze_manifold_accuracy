@@ -115,9 +115,7 @@ fprime = (oracle_log_score_deriv
 oracle_prob_sol = optimize.root_scalar(lambda p: f(p) - average_score, x0=0.6,
                                        fprime=fprime, method='newton')
 oracle_prob = oracle_prob_sol.root
-oracle_score = (oracle_log_score(oracle_prob)
-                if SCORE_FUNC == 'log'
-                else oracle_brier_score(oracle_prob))
+oracle_score = f(oracle_prob)
 print("This is as good as an oracle that knows the answer with probability",
       oracle_prob)
 print("Just checking: that oracle would get an average score of",
