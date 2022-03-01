@@ -89,16 +89,16 @@ for market in resolved_markets:
                                  market_bets))
         halfway_bet = early_bets[-1]
         market_prob = halfway_bet['probAfter']
-    outcome = market['resolution']
+    market_outcome = market['resolution']
     are_bets_binary = map(lambda bet: bet['outcome'] in ['YES', 'NO'],
                           market_bets)
     is_binary = functools.reduce(and_func, are_bets_binary, True)
-    defined_outcome = outcome in ['YES', 'NO']
+    defined_outcome = market_outcome in ['YES', 'NO']
     if is_binary and defined_outcome:
         if SCORE_FUNC == 'log':
-            scores.append(log_score(market_prob, outcome))
+            scores.append(log_score(market_prob, market_outcome))
         elif SCORE_FUNC == 'brier':
-            scores.append(brier_score(market_prob, outcome))
+            scores.append(brier_score(market_prob, market_outcome))
 
 average_score = sum(scores) / len(scores)
 print("Number of markets analyzed:", len(scores))
