@@ -1,7 +1,7 @@
 import requests, json, math, functools, datetime
 from scipy import optimize
 
-TIME_AVG = False
+TIME_AVG = True
 FRAC_TO_END = 0.5
 TAG = 'RussiaUkraine'
 SCORE_FUNC = 'log'
@@ -43,6 +43,7 @@ def brier_score(prob, outcome):
 
     
 scores = []
+is_yes = []
 for market in resolved_markets:
     market_id = market['id']
     market_url = "https://manifold.markets/api/v0/market/" + market_id
@@ -99,10 +100,16 @@ for market in resolved_markets:
             scores.append(log_score(market_prob, market_outcome))
         elif SCORE_FUNC == 'brier':
             scores.append(brier_score(market_prob, market_outcome))
+        if market_outcome == 'YES':
+            is_yes.append(1)
+        else:
+            is_yes.append(0)
 
 average_score = sum(scores) / len(scores)
+frac_yes = sum(is_yes) / len(is_yes)
 print("Number of markets analyzed:", len(scores))
 print("Average score:", average_score)
+print("Proportion of markets that resolved 'yes'", frac_yes)
 
 
 def oracle_log_score(p):
