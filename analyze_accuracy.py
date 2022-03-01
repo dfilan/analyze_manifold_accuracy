@@ -1,10 +1,13 @@
-import requests, json, math, functools
+import requests, json, math, functools, datetime
 from scipy import optimize
 
 TIME_AVG = True
 FRAC_TO_END = 0.5
 TAG = 'RussiaUkraine'
-SCORE_FUNC = 'brier'
+SCORE_FUNC = 'log'
+RESOLVE_BY = datetime.datetime.fromisoformat('2022-02-23T00:00:01-08:00')
+# or None if you don't want to put a time limit on when markets should have
+# resolved
 
 assert SCORE_FUNC in ['log', 'brier']
 
@@ -58,7 +61,13 @@ for market in resolved_markets:
     elif resolve_time is not None:
         end_time = resolve_time
     else:
+        print(market_data)
         assert False, "WTF no close or resolve time?"
+    if RESOLVE_BY is not None:
+        resolve_by_timestamp = RESOLVE_BY.timestamp() * 1000
+        if end_time > resolve_by_timestamp:
+            # only look at markets that have resolved before our set time.
+            continue
     market_bets = market_data['bets']
     if TIME_AVG:
         open_length = end_time - open_time
