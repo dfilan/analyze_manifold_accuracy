@@ -5,7 +5,7 @@ TIME_AVG = True
 FRAC_TO_END = 0.5
 TAG = 'RussiaUkraine'
 SCORE_FUNC = 'log'
-RESOLVE_BY = datetime.datetime.fromisoformat('2022-02-23T00:00:01-08:00')
+RESOLVE_BY = datetime.datetime.fromisoformat('2022-03-01T00:00:01-08:00')
 # or None if you don't want to put a time limit on when markets should have
 # resolved
 
