@@ -104,28 +104,28 @@ average_score = sum(scores) / len(scores)
 print("Number of markets analyzed:", len(scores))
 print("Average score:", average_score)
 
+
 def oracle_log_score(p):
     return p * math.log2(p) + (1-p) * math.log2(1-p)
+
 
 def oracle_brier_score(p):
     return p * (1 - p)**2 + (1-p) * p**2
 
-def oracle_log_score_deriv(p):
-    return math.log2(p) - math.log2(1-p)
-
-def oracle_brier_score_deriv(p):
-    return 1 - 2*p
-
 f = oracle_log_score if SCORE_FUNC == 'log' else oracle_brier_score
-fprime = (oracle_log_score_deriv
-          if SCORE_FUNC == 'log'
-          else oracle_brier_score_deriv)
-
-oracle_prob_sol = optimize.root_scalar(lambda p: f(p) - average_score, x0=0.6,
-                                       fprime=fprime, method='newton')
-oracle_prob = oracle_prob_sol.root
-oracle_score = f(oracle_prob)
-print("This is as good as an oracle that knows the answer with probability",
-      oracle_prob)
-print("Just checking: that oracle would get an average score of",
-      oracle_score)
+worst_oracle_val = f(0.5)
+fail_string = "On these questions, Manifold was worse than a coin-flip."
+if SCORE_FUNC == 'log' and average_score < worst_oracle_val:
+    print(fail_string)
+elif SCORE_FUNC == 'brier' and average_score > worst_oracle_val:
+    print(fail_string)
+else:
+    oracle_prob_sol = optimize.root_scalar(lambda p: f(p) - average_score,
+                                           bracket=[0.501, 0.999],
+                                           method='brentq')
+    oracle_prob = oracle_prob_sol.root
+    oracle_score = f(oracle_prob)
+    print("This is as good as an oracle that knows the answer with probability",
+          oracle_prob)
+    print("Just checking: that oracle would get an average score of",
+          oracle_score)
