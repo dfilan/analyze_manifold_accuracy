@@ -1,7 +1,7 @@
 import requests, json, math, functools, datetime
 from scipy import optimize
 
-TIME_AVG = True
+TIME_AVG = False
 FRAC_TO_END = 0.5
 TAG = 'RussiaUkraine'
 SCORE_FUNC = 'log'
@@ -33,12 +33,12 @@ def and_func(x, y):
 
 
 def log_score(prob, outcome):
-    prob_outcome = market_prob if outcome == 'YES' else 1 - market_prob
+    prob_outcome = prob if outcome == 'YES' else 1 - prob
     return math.log2(prob_outcome)
 
 
 def brier_score(prob, outcome):
-    prob_outcome = market_prob if outcome == 'YES' else 1 - market_prob
+    prob_outcome = prob if outcome == 'YES' else 1 - prob
     return (1 - prob_outcome)**2
 
     
@@ -82,7 +82,7 @@ for market in resolved_markets:
             total_bet_weight += bet_weight
             market_prob += bet['probAfter'] * bet_weight
         market_prob /= total_bet_weight
-        assert total_bet_weight > 0.98 and total_bet_weight < 1.02
+        assert 0.98 < total_bet_weight < 1.02
     else:
         test_point = open_time * (1 - FRAC_TO_END) + end_time * FRAC_TO_END
         early_bets = list(filter(lambda bet: bet['createdTime'] < test_point,
