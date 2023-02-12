@@ -95,14 +95,15 @@ for i, market in enumerate(resolved_markets):
             # only look at markets that have resolved before our set time.
             number_no_results += 1
             continue
+    sorted_bets = sorted(market_bets, key=lambda x: x['createdTime'])
     if TIME_AVG:
         open_length = end_time - open_time
-        num_bets = len(market_bets)
+        num_bets = len(sorted_bets)
         market_prob = 0
         total_bet_weight = 0
-        for j, bet in enumerate(market_bets):
+        for j, bet in enumerate(sorted_bets):
             bet_time = bet['createdTime']
-            next_bet_time = (market_bets[j+1]['createdTime']
+            next_bet_time = (sorted_bets[j+1]['createdTime']
                              if j != num_bets - 1 else end_time)
             bet_weight = (next_bet_time - bet_time) / open_length
             total_bet_weight += bet_weight
@@ -112,17 +113,19 @@ for i, market in enumerate(resolved_markets):
     else:
         test_point = open_time * (1 - FRAC_TO_END) + end_time * FRAC_TO_END
         early_bets = list(filter(lambda bet: bet['createdTime'] < test_point,
-                                 market_bets))
+                                 sorted_bets))
         # print(len(early_bets))
         if len(early_bets) == 0:
             print("Market with no bets before half-way thru:", market_question)
             number_no_bets += 1
             continue
         halfway_bet = early_bets[-1]
+        assert halfway_bet['createdTime'] < test_point
+        assert halfway_bet['createdTime'] >= sorted_bets[0]['createdTime']
         market_prob = halfway_bet['probAfter']
     market_outcome = market['resolution']
     are_bets_binary = map(lambda bet: bet['outcome'] in ['YES', 'NO'],
-                          market_bets)
+                          sorted_bets)
     is_binary = functools.reduce(and_func, are_bets_binary, True)
     defined_outcome = market_outcome in ['YES', 'NO']
     if is_binary and defined_outcome:
