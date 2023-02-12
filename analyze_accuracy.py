@@ -1,11 +1,13 @@
 import requests, json, math, functools, datetime
 from scipy import optimize
 
-TIME_AVG = True
+# TODO figure out issue where I can only get 1000 bets
+
+TIME_AVG = False
 FRAC_TO_END = 0.5
-TAG = 'RussiaUkraine'
-SCORE_FUNC = 'log'
-RESOLVE_BY = datetime.datetime.fromisoformat('2022-03-01T00:00:01-08:00')
+TAG = "Ukraine-Russia war" # or None if we're just looking at all questions
+SCORE_FUNC = 'brier'
+RESOLVE_BY = datetime.datetime.fromisoformat('2023-02-01T00:00:01-08:00')
 # or None if you don't want to put a time limit on when markets should have
 # resolved
 
@@ -19,14 +21,28 @@ else:
 
 print("Analysis will use the " + SCORE_FUNC + " score.")
 
-url = requests.get("https://manifold.markets/api/v0/markets")
+groups_url = requests.get("https://manifold.markets/api/v0/groups")
+groups_data = json.loads(groups_url.text)
+# print(f"{len(groups_data)=}")
+for group in groups_data:
+    if group['name'] == TAG:
+        group_id = group['id']
+        # print(group)
+        # print(group_id)
+        break
+
+url = requests.get("https://manifold.markets/api/v0/group/by-id/" + group_id + "/markets")
 text = url.text
 data = json.loads(text)
+# print(len(data))
 resolved_markets = []
-for market in data:
-    if TAG in market['tags'] and market['isResolved']:
+for i, market in enumerate(data):
+    # if i == 0:
+    #     print(market)
+    if market['isResolved']:
         resolved_markets.append(market)
 
+print(len(resolved_markets), "markets resolved.")
 
 def and_func(x, y):
     return x and y
@@ -44,32 +60,41 @@ def brier_score(prob, outcome):
     
 scores = []
 is_yes = []
-for market in resolved_markets:
+number_non_binary = 0
+number_no_bets = 0
+number_no_results = 0
+for i, market in enumerate(resolved_markets):
     market_id = market['id']
-    market_url = "https://manifold.markets/api/v0/market/" + market_id
-    r = requests.get(market_url)
+    market_question = market['question']
+    bets_url = "https://manifold.markets/api/v0/bets/"
+    r = requests.get(bets_url, params={'contractId': market_id})
     text = r.text
-    market_data = json.loads(text)
-    open_time = market_data['createdTime']
-    close_time = (market_data['closeTime']
-                  if 'closeTime' in market_data else None)
-    resolve_time = (market_data['resolutionTime']
-                    if 'resolutionTime' in market_data else None)
+    market_bets = json.loads(text)
+    if len(market_bets) == 1000:
+        print("Ran into API limits for this one")
+    # if i == 0:
+    #     print(len(market_bets))
+    #     print(len(market_bets[0]))
+    #     print(market_bets[0])
+    #     print(market_bets[1])
+    open_time = market['createdTime']
+    close_time = (market['closeTime']
+                  if 'closeTime' in market else None)
+    resolve_time = (market['resolutionTime']
+                    if 'resolutionTime' in market else None)
+    assert close_time is not None or resolve_time is not None, f"WTF no close or resolve time?, market {i}"
     if close_time is not None and resolve_time is not None:
         end_time = min(close_time, resolve_time)
     elif close_time is not None:
         end_time = close_time
     elif resolve_time is not None:
         end_time = resolve_time
-    else:
-        print(market_data)
-        assert False, "WTF no close or resolve time?"
     if RESOLVE_BY is not None:
         resolve_by_timestamp = RESOLVE_BY.timestamp() * 1000
         if end_time > resolve_by_timestamp:
             # only look at markets that have resolved before our set time.
+            number_no_results += 1
             continue
-    market_bets = market_data['bets']
     if TIME_AVG:
         open_length = end_time - open_time
         num_bets = len(market_bets)
@@ -88,6 +113,11 @@ for market in resolved_markets:
         test_point = open_time * (1 - FRAC_TO_END) + end_time * FRAC_TO_END
         early_bets = list(filter(lambda bet: bet['createdTime'] < test_point,
                                  market_bets))
+        # print(len(early_bets))
+        if len(early_bets) == 0:
+            print("Market with no bets before half-way thru:", market_question)
+            number_no_bets += 1
+            continue
         halfway_bet = early_bets[-1]
         market_prob = halfway_bet['probAfter']
     market_outcome = market['resolution']
@@ -104,10 +134,15 @@ for market in resolved_markets:
             is_yes.append(1)
         else:
             is_yes.append(0)
+    else:
+        number_non_binary += 1
 
 average_score = sum(scores) / len(scores)
 frac_yes = sum(is_yes) / len(is_yes)
 print("Number of markets analyzed:", len(scores))
+print("Number of non-binary markets:", number_non_binary)
+print("Number of markets not resolved in time:", number_no_results)
+print("Number of markets with no bets before half-way thru:", number_no_bets)
 print("Average score:", average_score)
 print("Proportion of markets that resolved 'yes'", frac_yes)
 
